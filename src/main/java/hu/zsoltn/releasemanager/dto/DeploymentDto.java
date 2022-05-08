@@ -1,4 +1,4 @@
-package hu.zsoltn.releasemanager.domain;
+package hu.zsoltn.releasemanager.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Deployment {
+public class DeploymentDto {
   private String name;
   private int version;
 }
