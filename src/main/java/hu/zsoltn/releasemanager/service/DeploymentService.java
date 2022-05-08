@@ -1,51 +1,51 @@
 package hu.zsoltn.releasemanager.service;
 
+import hu.zsoltn.releasemanager.db.DeploymentRepository;
 import hu.zsoltn.releasemanager.dto.DeploymentDto;
 import hu.zsoltn.releasemanager.entity.DeploymentEntity;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static java.util.function.BinaryOperator.maxBy;
-
 @Service
+@RequiredArgsConstructor
 public class DeploymentService {
 
-  private final List<DeploymentEntity> entities = new LinkedList<>();
+  private final DeploymentRepository deploymentRepository;
 
   public List<DeploymentDto> findDeployments(final int systemVersion) {
-    return entities.stream()
-        .filter(entity -> entity.getSystemVersion() <= systemVersion)
-        .collect(Collectors.toMap(
-            DeploymentEntity::getName,
-            Function.identity(),
-            maxBy(Comparator.comparing(DeploymentEntity::getSystemVersion))))
-        .values()
+    return deploymentRepository
+        .findDeploymentsOfSystem(systemVersion)
         .stream()
-        .map(entity -> new DeploymentDto(entity.getName(), entity.getVersion()))
-        .sorted(Comparator.comparing(DeploymentDto::getName))
+        .map(DeploymentService::toDto)
         .collect(Collectors.toList());
   }
 
   public int deploy(final DeploymentDto deployment) {
-    final int currentSystemVersion = entities.stream()
+    final int currentSystemVersion = deploymentRepository.findFirstByOrderBySystemVersionDesc()
         .map(DeploymentEntity::getSystemVersion)
-        .max(Integer::compareTo)
         .orElse(0);
 
-    final Optional<DeploymentEntity> existing = entities.stream()
-        .filter(entity -> Objects.equals(entity.getName(), deployment.getName()))
-        .filter(entity -> entity.getVersion() == deployment.getVersion())
-        .findFirst();
-    if(existing.isPresent()) {
+    final String name = deployment.getName();
+    final int version = deployment.getVersion();
+    final Optional<DeploymentEntity> existing = deploymentRepository
+        .findFirstByNameOrderBySystemVersionDesc(name);
+    if(existing.isPresent() && existing.get().getVersion() == version) {
       return currentSystemVersion;
     }
 
-    final int updatedSystemVersion = currentSystemVersion + 1;
-    entities.add(new DeploymentEntity(deployment.getName(), deployment.getVersion(), updatedSystemVersion));
-    return updatedSystemVersion;
+    final DeploymentEntity entity = deploymentRepository.save(toEntity(deployment, currentSystemVersion + 1));
+    return entity.getSystemVersion();
+  }
+
+  private static DeploymentDto toDto(final DeploymentEntity entity) {
+    return new DeploymentDto(entity.getName(), entity.getVersion());
+  }
+
+  private static DeploymentEntity toEntity(final DeploymentDto dto, final int systemVersion) {
+    return new DeploymentEntity(systemVersion, dto.getName(), dto.getVersion());
   }
 
 }
